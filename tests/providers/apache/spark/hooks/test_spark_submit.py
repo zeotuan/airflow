@@ -62,6 +62,7 @@ class TestSparkSubmitHook:
             "args should keep embedded spaces",
             "baz",
         ],
+        "use_krb5ccache": True,
     }
 
     @staticmethod
@@ -200,6 +201,8 @@ class TestSparkSubmitHook:
             "--with-spaces",
             "args should keep embedded spaces",
             "baz",
+            "--conf",
+            "spark.kerberos.renewal.credentials=ccache",
         ]
         assert expected_build_cmd == cmd
 

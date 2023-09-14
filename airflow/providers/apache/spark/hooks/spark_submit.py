@@ -27,7 +27,7 @@ from typing import Any, Iterator
 from airflow.configuration import conf as airflow_conf
 from airflow.exceptions import AirflowException
 from airflow.hooks.base import BaseHook
-from airflow.security.kerberos import renew_from_kt
+from airflow.security.kerberos import get_kerberos_principle, renew_from_kt
 from airflow.utils.log.logging_mixin import LoggingMixin
 
 with contextlib.suppress(ImportError, NameError):
@@ -111,6 +111,7 @@ class SparkSubmitHook(BaseHook, LoggingMixin):
         executor_memory: str | None = None,
         driver_memory: str | None = None,
         keytab: str | None = None,
+        use_krb5ccache: bool = False,
         principal: str | None = None,
         proxy_user: str | None = None,
         name: str = "default-name",
@@ -138,7 +139,8 @@ class SparkSubmitHook(BaseHook, LoggingMixin):
         self._executor_memory = executor_memory
         self._driver_memory = driver_memory
         self._keytab = keytab
-        self._principal = principal
+        self._principal = get_kerberos_principle(principal) if use_krb5ccache else principal
+        self._use_krb5ccache = use_krb5ccache
         self._proxy_user = proxy_user
         self._name = name
         self._num_executors = num_executors
@@ -329,6 +331,12 @@ class SparkSubmitHook(BaseHook, LoggingMixin):
             connection_cmd += ["--queue", self._connection["queue"]]
         if self._connection["deploy_mode"]:
             connection_cmd += ["--deploy-mode", self._connection["deploy_mode"]]
+        if self._use_krb5ccache:
+            if not os.getenv("KRB5CCNAME"):
+                raise AirflowException(
+                    "KRB5CCNAME environment variable required to use ticket ccache is missing."
+                )
+            connection_cmd += ["--conf", "spark.kerberos.renewal.credentials=ccache"]
 
         # The actual script to execute
         connection_cmd += [application]
