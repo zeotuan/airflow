@@ -143,9 +143,10 @@ class TestSparkSubmitHook:
             )
         )
 
-    @patch("airflow.providers.apache.spark.hooks.spark_submit.os.getenv")
-    def test_build_spark_submit_command(self, mock_getenv):
-        mock_getenv.return_value = "test_string_val"
+    @patch(
+        "airflow.providers.apache.spark.hooks.spark_submit.os.getenv", return_value="/tmp/airflow_krb5_ccache"
+    )
+    def test_build_spark_submit_command(self):
         # Given
         hook = SparkSubmitHook(**self._config)
 
@@ -187,6 +188,8 @@ class TestSparkSubmitHook:
             "privileged_user.keytab",
             "--principal",
             "user/spark@airflow.org",
+            "--conf",
+            "spark.kerberos.renewal.credentials=ccache",
             "--proxy-user",
             "sample_user",
             "--name",
@@ -202,10 +205,19 @@ class TestSparkSubmitHook:
             "--with-spaces",
             "args should keep embedded spaces",
             "baz",
-            "--conf",
-            "spark.kerberos.renewal.credentials=ccache",
         ]
         assert expected_build_cmd == cmd
+
+    def test_resolve_spark_submit_env_vars_use_krb5ccache_missing_principal(self):
+        with pytest.raises(ValueError):
+            SparkSubmitHook(conn_id="spark_yarn_cluster", principal=None, use_krb5ccache=True)
+
+    def test_resolve_spark_submit_env_vars_use_krb5ccache_missing_KRB5CCNAME_env(self):
+        hook = SparkSubmitHook(
+            conn_id="spark_yarn_cluster", principal="user/spark@airflow.org", use_krb5ccache=True
+        )
+        with pytest.raises(AirflowException):
+            hook._build_spark_submit_command(self._spark_job_file)
 
     def test_build_track_driver_status_command(self):
         # note this function is only relevant for spark setup matching below condition

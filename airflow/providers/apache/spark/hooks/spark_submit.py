@@ -319,6 +319,12 @@ class SparkSubmitHook(BaseHook, LoggingMixin):
             connection_cmd += ["--keytab", self._keytab]
         if self._principal:
             connection_cmd += ["--principal", self._principal]
+        if self._use_krb5ccache:
+            if not os.getenv("KRB5CCNAME"):
+                raise AirflowException(
+                    "KRB5CCNAME environment variable required to use ticket ccache is missing."
+                )
+            connection_cmd += ["--conf", "spark.kerberos.renewal.credentials=ccache"]
         if self._proxy_user:
             connection_cmd += ["--proxy-user", self._proxy_user]
         if self._name:
@@ -331,13 +337,6 @@ class SparkSubmitHook(BaseHook, LoggingMixin):
             connection_cmd += ["--queue", self._connection["queue"]]
         if self._connection["deploy_mode"]:
             connection_cmd += ["--deploy-mode", self._connection["deploy_mode"]]
-        if self._use_krb5ccache:
-            if not os.getenv("KRB5CCNAME"):
-                raise AirflowException(
-                    "KRB5CCNAME environment variable required to use ticket ccache is missing."
-                )
-            connection_cmd += ["--conf", "spark.kerberos.renewal.credentials=ccache"]
-
         # The actual script to execute
         connection_cmd += [application]
 
