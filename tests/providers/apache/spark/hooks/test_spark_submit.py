@@ -143,7 +143,9 @@ class TestSparkSubmitHook:
             )
         )
 
-    def test_build_spark_submit_command(self):
+    @patch("airflow.providers.apache.spark.hooks.spark_submit.os.getenv")
+    def test_build_spark_submit_command(self, mock_getenv):
+        mock_getenv.return_value = "test_string_val"
         # Given
         hook = SparkSubmitHook(**self._config)
 
