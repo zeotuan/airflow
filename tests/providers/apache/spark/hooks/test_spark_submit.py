@@ -146,7 +146,7 @@ class TestSparkSubmitHook:
     @patch(
         "airflow.providers.apache.spark.hooks.spark_submit.os.getenv", return_value="/tmp/airflow_krb5_ccache"
     )
-    def test_build_spark_submit_command(self):
+    def test_build_spark_submit_command(self, mock_get_env):
         # Given
         hook = SparkSubmitHook(**self._config)
 
@@ -207,10 +207,17 @@ class TestSparkSubmitHook:
             "baz",
         ]
         assert expected_build_cmd == cmd
+        mock_get_env.assert_called_with("KRB5CCNAME")
 
-    def test_resolve_spark_submit_env_vars_use_krb5ccache_missing_principal(self):
-        with pytest.raises(ValueError):
-            SparkSubmitHook(conn_id="spark_yarn_cluster", principal=None, use_krb5ccache=True)
+    @patch("airflow.providers.apache.spark.hooks.spark_submit.get_kerberos_principle")
+    def test_resolve_spark_submit_env_vars_use_krb5ccache_missing_principal(
+        self, get_kerberos_principle_mock
+    ):
+        mock_principle = "airflow"
+        get_kerberos_principle_mock.return_value = mock_principle
+        hook = SparkSubmitHook(conn_id="spark_yarn_cluster", principal=None, use_krb5ccache=True)
+        get_kerberos_principle_mock.assert_called_with(None)
+        assert hook._principal == mock_principle
 
     def test_resolve_spark_submit_env_vars_use_krb5ccache_missing_KRB5CCNAME_env(self):
         hook = SparkSubmitHook(
